@@ -1,0 +1,18 @@
+- name: Destroy Linode.
+  hosts: localhost
+  vars:
+    linode_token: "{{ lookup('env', 'LINODE_ACCESS_TOKEN') }}"
+
+  vars_files:
+  - config.yml
+
+  tasks:
+  - name: Destroy Linode server.
+    linode_v4:
+      label: "{{ server_name }}"
+      access_token: "{{ linode_token }}"
+      state: absent
+    register: server
+    loop: "{{ server_names }}"
+    loop_control:
+      loop_var: server_name

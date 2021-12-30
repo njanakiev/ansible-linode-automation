@@ -1,0 +1,20 @@
+- name: Create Linode
+  hosts: localhost
+  vars:
+    linode_token: "{{ lookup('env', 'LINODE_ACCESS_TOKEN') }}"
+  
+  vars_files:
+  - config.yml
+
+  tasks:
+  - name: Create a new Linode.
+    linode_v4:
+      label: "server1"
+      access_token: "{{ linode_token }}"
+      type: g6-nanode-1
+      region: us-east
+      image: linode/debian9
+      root_pass: "{{ root_password }}"
+      authorized_keys: "{{ ssh_keys }}"
+      state: present
+    register: server

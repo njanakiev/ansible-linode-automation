@@ -1,0 +1,59 @@
+---
+- name: Create Linode
+  hosts: localhost
+  vars:
+    linode_token: "{{ lookup('env', 'LINODE_ACCESS_TOKEN') }}"
+  
+  vars_files:
+  - config.yml
+
+  pre_tasks:
+  - name: Create Linode servers.
+    linode.cloud.instance:
+      label: "{{ server_name }}"
+      api_token: "{{ linode_token }}"
+      type: "{{ server_type }}"
+      region: "{{ server_region }}"
+      image: "{{ server_image }}"
+      root_pass: "{{ root_password }}"
+      authorized_keys: "{{ ssh_keys }}"
+      state: present
+    register: server
+    loop: "{{ server_names }}"
+    loop_control:
+      loop_var: server_name
+
+  - name: Refresh inventory after adding servers.
+    meta: refresh_inventory
+
+  - name: Remove host keys of servers.
+    known_hosts:
+      name: "{{ item.instance.ipv4 }}"
+      path: ~/.ssh/known_hosts
+      state: absent
+    loop: "{{ server.results }}"
+
+  - name: Wait until servers are ready.
+    wait_for:
+      host: "{{ item.instance.ipv4[0] }}"
+      port: 22
+      search_regex: OpenSSH
+      delay: 2
+      timeout: 300
+    loop: "{{ server.results }}"
+
+
+- name: Setup docker on servers.
+  hosts: all
+  user: root
+  gather_facts: false
+
+  tasks:
+  - import_tasks: tasks/install-docker.yml
+
+  - name: "Create user {{ username }}."
+    user:
+      name: "{{ username }}"
+      password: "{{ password | password_hash('sha512') }}"
+      groups: sudo,docker
+      append: true

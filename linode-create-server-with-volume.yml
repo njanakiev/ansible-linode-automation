@@ -1,0 +1,101 @@
+---
+- name: Create Linode
+  hosts: localhost
+  gather_facts: false
+  vars:
+    linode_token: "{{ lookup('env', 'LINODE_ACCESS_TOKEN') }}"
+  
+  vars_files:
+  - config.yml
+
+  pre_tasks:
+  - name: Create Linode servers.
+    linode.cloud.instance:
+      label: "{{ server_name }}"
+      api_token: "{{ linode_token }}"
+      type: "{{ server_type }}"
+      region: "{{ server_region }}"
+      image: "{{ server_image }}"
+      root_pass: "{{ root_password }}"
+      authorized_keys: "{{ ssh_keys }}"
+      state: present
+    register: server
+
+  - name: Refresh inventory after adding servers.
+    meta: refresh_inventory
+
+  - name: Remove host keys of servers.
+    known_hosts:
+      name: "{{ server.instance.ipv4 }}"
+      path: ~/.ssh/known_hosts
+      state: absent
+
+  - name: Wait until servers are ready.
+    wait_for:
+      host: "{{ server.instance.ipv4[0] }}"
+      port: 22
+      search_regex: OpenSSH
+      delay: 2
+      timeout: 300
+
+  - name: Create a volume attached to an instance.
+    linode.cloud.volume:
+      api_token: "{{ linode_token }}"
+      label: "{{ volume_name }}"
+      region: "{{ volume_region }}"
+      size: "{{ volume_size }}"
+      linode_id: "{{ server.instance.id }}"
+      state: present
+    register: volume
+
+- name: Setup server.
+  hosts: all
+  user: root
+  gather_facts: false
+  vars:
+  - filesystem_path: "{{ hostvars.localhost.volume.volume.filesystem_path }}"
+  vars_files:
+  - config.yml
+
+  tasks:
+  - debug: var=filesystem_path
+
+  - name: Connect volume.
+    shell: |
+      mkfs.ext4 {{ filesystem_path }}
+      mkdir /mnt/{{ volume_name }}
+      mount {{ filesystem_path }} /mnt/{{ volume_name }}
+      echo "{{ filesystem_path }} /mnt/{{ volume_name }} ext4 defaults,noatime,nofail 0 2\n" >> /etc/fstab
+    args: 
+      creates: "/mnt/{{ volume_name }}"
+
+  - import_tasks: tasks/install-docker.yml
+  
+  - name: "Create user {{ username }}."
+    user:
+      name: "{{ username }}"
+      password: "{{ password | password_hash('sha512') }}"
+      groups: sudo,docker
+      append: true
+
+  - name: Update git repository.
+    apt_repository:
+      repo: 'ppa:git-core/ppa'
+      state: present
+  
+  - name: Install git.
+    apt:
+      name: git
+      state: present
+      update_cache: yes
+
+  - name: Install packages.
+    apt:
+      name: "{{ item }}"
+      state: latest
+      update_cache: true
+      cache_valid_time: 3600
+    loop:
+    - python3
+    - python3-pip
+    - python-is-python3

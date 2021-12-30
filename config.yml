@@ -1,0 +1,14 @@
+---
+server_names:
+- server1
+- server2
+
+ssh_keys: ~/.ssh/linode.pub
+
+server_type: g6-nanode-1
+server_image: linode/ubuntu20.04
+server_region: us-east
+
+volume_name: data_volume
+volume_size: 100
+volume_region: us-east
