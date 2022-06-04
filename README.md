@@ -39,10 +39,10 @@ The `ssh_keys` variable denotes the location of the public keys that should be l
 
 # Usage
 
-First, export your `LINODE_ACCESS_TOKEN` as a variable from Linode with:
+First, export your `LINODE_API_TOKEN` as a variable from Linode with:
 
 ```bash
-export LINODE_ACCESS_TOKEN=XXXX
+export LINODE_API_TOKEN=XXXX
 ```
 
 To create a simple server defined in you can run the playbook:
